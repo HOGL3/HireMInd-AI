@@ -31,17 +31,19 @@ interface Job {
 
 // ─── Source label map ─────────────────────────────────────────────────────────
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
-  'adzuna':               { label: 'Adzuna',     color: 'bg-blue-50 text-blue-600 border-blue-100' },
-  'remotive':             { label: 'Remotive',   color: 'bg-purple-50 text-purple-600 border-purple-100' },
-  'remoteok':             { label: 'RemoteOK',   color: 'bg-rose-50 text-rose-600 border-rose-100' },
-  'arbeitnow':            { label: 'Arbeitnow',  color: 'bg-amber-50 text-amber-600 border-amber-100' },
-  'the-muse':             { label: 'The Muse',   color: 'bg-pink-50 text-pink-600 border-pink-100' },
-  'hiremind-india-cache': { label: '🇮🇳 India',   color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
-  'hiremind-fallback':    { label: 'Sample',     color: 'bg-zinc-50 text-zinc-500 border-zinc-200' },
+  'adzuna':          { label: 'Adzuna',    color: 'bg-blue-50 text-blue-600 border-blue-100' },
+  'remotive':        { label: 'Remotive',  color: 'bg-purple-50 text-purple-600 border-purple-100' },
+  'remoteok':        { label: 'RemoteOK',  color: 'bg-rose-50 text-rose-600 border-rose-100' },
+  'arbeitnow':       { label: 'Arbeitnow', color: 'bg-amber-50 text-amber-600 border-amber-100' },
+  'the-muse':        { label: 'The Muse',  color: 'bg-pink-50 text-pink-600 border-pink-100' },
+  'findwork':        { label: 'Findwork',  color: 'bg-sky-50 text-sky-600 border-sky-100' },
+  'hiremind-india':  { label: '🇮🇳 India',  color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  'hiremind-india-cache': { label: '🇮🇳 India', color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  'hiremind-fallback': { label: '🇮🇳 India', color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
 }
 
 // ─── Fetcher (used by React Query) ───────────────────────────────────────────
-async function fetchJobs(query: string, location: string, remote: boolean): Promise<{ jobs: Job[]; source: string }> {
+async function fetchJobs(query: string, location: string, remote: boolean): Promise<{ jobs: Job[]; source: string; liveCount: number }> {
   const params = new URLSearchParams()
   if (query)    params.append('q', query)
   if (location) params.append('location', location)
@@ -53,7 +55,8 @@ async function fetchJobs(query: string, location: string, remote: boolean): Prom
   if (!Array.isArray(data)) throw new Error('Invalid response')
   return {
     jobs: data as Job[],
-    source: res.headers.get('X-Jobs-Source') ?? 'unknown',
+    source:    res.headers.get('X-Jobs-Source') ?? 'unknown',
+    liveCount: Number(res.headers.get('X-Live-Count') ?? 0),
   }
 }
 
@@ -191,7 +194,8 @@ function DashboardContent() {
 
   const jobs: Job[]   = data?.jobs ?? []
   const apiSource     = data?.source ?? ''
-  const isFallback    = apiSource.startsWith('fallback')
+  const liveCount     = data?.liveCount ?? 0
+  const isFallback    = liveCount === 0 && jobs.length > 0
 
   const displayJobs = jobs.filter(j =>
     filterJobType === 'all' || j.job_type.toLowerCase() === filterJobType
@@ -322,7 +326,7 @@ function DashboardContent() {
             >
               <div className="flex items-center gap-3">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-                <span>Live job sources unreachable. Showing cached Indian job listings below.</span>
+                <span>Live job sources unreachable after 3 retries. Showing curated Indian company listings below.</span>
               </div>
               <button onClick={() => refetch()} id="retry-btn"
                 className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded-full text-xs font-bold transition-colors shrink-0">
@@ -337,7 +341,19 @@ function DashboardContent() {
               className="bg-amber-50 border border-amber-200 text-amber-700 px-5 py-4 rounded-2xl mb-6 text-sm font-medium flex items-center gap-3 shadow-sm"
             >
               <Info className="w-4 h-4 shrink-0" />
-              Showing cached Indian sample jobs. Add Adzuna API keys in <code className="mx-1 text-xs bg-amber-100 px-1.5 py-0.5 rounded font-mono">.env</code> for live results.
+              Live APIs returned no results — showing curated Indian tech company listings.
+              Add <code className="mx-1 text-xs bg-amber-100 px-1.5 py-0.5 rounded font-mono">ADZUNA_APP_ID</code> &amp;
+              <code className="mx-1 text-xs bg-amber-100 px-1.5 py-0.5 rounded font-mono">ADZUNA_APP_KEY</code> in your <code className="mx-1 text-xs bg-amber-100 px-1.5 py-0.5 rounded font-mono">.env</code> for 250 live results/day.
+            </motion.div>
+          )}
+
+          {!isError && !isFallback && liveCount > 0 && !isLoading && (
+            <motion.div key="live"
+              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-5 py-4 rounded-2xl mb-6 text-sm font-medium flex items-center gap-3 shadow-sm"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span><strong>{liveCount}</strong> live jobs fetched · <strong>{indiaCount}</strong> India-relevant listings shown first</span>
             </motion.div>
           )}
         </AnimatePresence>
