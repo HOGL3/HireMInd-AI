@@ -8,6 +8,7 @@ import os
 import re
 from datetime import datetime, timezone
 from typing import List, Dict, Optional
+import io
 
 # ── Skill vocabulary (English + India tech ecosystem) ──────────────
 COMMON_SKILLS = [
@@ -338,6 +339,39 @@ def _build_why(score, matched, missing, job_loc, user_loc,
     return '. '.join(parts).capitalize() + '.' if parts else f"Score: {score}%"
 
 
+# ── File Text Extraction ──────────────────────────────────────────
+def extract_text_from_pdf(file_stream) -> str:
+    try:
+        from pdfminer.high_level import extract_text
+        return extract_text(file_stream)
+    except Exception as e:
+        print(f"PDF extraction error: {e}")
+        return ""
+
+def extract_text_from_docx(file_stream) -> str:
+    try:
+        import docx
+        doc = docx.Document(file_stream)
+        return "\n".join([para.text for para in doc.paragraphs])
+    except Exception as e:
+        print(f"Docx extraction error: {e}")
+        return ""
+
+def extract_text_from_file(file_obj) -> str:
+    """Detect extension and extract text."""
+    name = file_obj.name.lower()
+    if name.endswith('.pdf'):
+        return extract_text_from_pdf(file_obj)
+    if name.endswith('.docx'):
+        return extract_text_from_docx(file_obj)
+    if name.endswith('.txt'):
+        try:
+            return file_obj.read().decode('utf-8')
+        except:
+            return ""
+    return ""
+
+
 # ── Cover letter ───────────────────────────────────────────────────
 def generate_cover_letter(user_profile: Dict, job: Dict) -> str:
     openai_key = os.environ.get('OPENAI_API_KEY', '')
@@ -367,6 +401,61 @@ def generate_cover_letter(user_profile: Dict, job: Dict) -> str:
         f"With my background in {skills_str}, I am confident I can contribute significantly.\n\n"
         f"Sincerely,\n[Your Name]"
     )
+
+
+# ── Resume Analysis ───────────────────────────────────────────────
+def analyze_resume(resume_text: str) -> Dict:
+    """
+    Analyzes resume text and returns a rating (0-100) and improvement suggestions.
+    """
+    openai_key = os.environ.get('OPENAI_API_KEY', '')
+    
+    if openai_key and openai_key not in ('your_openai_key', ''):
+        try:
+            import openai
+            import json
+            client = openai.OpenAI(api_key=openai_key)
+            prompt = (
+                "You are an expert technical recruiter. Analyze the provided resume text thoroughly.\n"
+                "1. Provide a 'score' (0-100) reflecting market readiness for modern tech roles.\n"
+                "2. Provide 4 'suggestions' that are highly specific, logical, and actionable (e.g., 'Quantify your impact at X company', 'Add project links for Y skill').\n"
+                "3. List 2-3 key 'strengths' found in the content.\n"
+                "Return valid JSON only.\n"
+                "Format: {\"score\": number, \"suggestions\": [string, string, string, string], \"strengths\": [string, string]}\n"
+                f"Resume Text Content:\n{resume_text[:6000]}"
+            )
+            response = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=[{'role': 'system', 'content': 'You are a logical and rigorous career consultant.'},
+                          {'role': 'user', 'content': prompt}],
+                response_format={"type": "json_object"},
+                max_tokens=800,
+            )
+            return json.loads(response.choices[0].message.content)
+        except Exception as e:
+            print(f"Resume analysis error: {e}")
+            pass
+
+    # Simple fallback analysis
+    skills = extract_skills_from_text(resume_text)
+    score = 40 + min(40, len(skills) * 5) # Base 40 + 5 per skill
+    if len(resume_text) < 200: score -= 20
+    
+    suggestions = [
+        "Add more specific technical metrics (e.g., 'Improved latency by 20%').",
+        "Include links to live projects or your GitHub profile.",
+        "Ensure your contact information is clearly visible at the top.",
+        "Use more action verbs like 'Architected', 'Implemented', or 'Optimized'."
+    ]
+    
+    if len(skills) < 3:
+        suggestions.insert(0, "Highlight more core technical skills like React, Python, or AWS.")
+    
+    return {
+        "score": min(95, score),
+        "suggestions": suggestions[:4],
+        "strengths": [s.capitalize() for s in skills[:2]] if skills else ["Professional attempt"]
+    }
 
 
 # ── Career Copilot ─────────────────────────────────────────────────

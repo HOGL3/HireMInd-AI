@@ -16,6 +16,7 @@ export interface NormalizedJob {
   apply_link: string;
   source: string;
   india_relevant: boolean;
+  verified: boolean;
 }
 
 // ─── India relevance scoring ──────────────────────────────────────────────────
@@ -36,16 +37,45 @@ function isIndiaRelevant(location: string): boolean {
   return false;
 }
 
-// ─── Minimal validation — only block truly broken listings ───────────────────
+// ─── Minimal validation — only block truly broken or spammy listings ───────
+const SPAM_KEYWORDS = [
+  'generic', 'test job', 'do not apply', 'dummy', 'spam', 'urgent hiring for',
+  'any city', 'work from any location', 'pan india', 'immediate joiner',
+  'multiple roles', 'urgent requirement', 'openings for', 'looking for candidates',
+];
+
 function isValidJob(job: NormalizedJob): boolean {
-  if (!job.title || job.title.trim().length < 3) return false;
+  if (!job.title || job.title.trim().length < 5) return false;
   if (!job.company || job.company.trim().length < 2) return false;
-  // Block only truly bad company names
-  const badCompany = ['', 'n/a', 'na', 'none', 'null'];
-  if (badCompany.includes(job.company.toLowerCase().trim())) return false;
-  // Must have some apply link (relax to include non-http links too)
-  if (!job.apply_link || job.apply_link.length < 5) return false;
+  
+  const title = job.title.toLowerCase();
+  const company = job.company.toLowerCase();
+
+  // Block too short or purely numeric titles
+  if (/^\d+$/.test(title)) return false;
+
+  // Block bad company names
+  const badCompany = ['', 'n/a', 'na', 'none', 'null', 'unknown', 'confidential', 'stealth'];
+  if (badCompany.includes(company.trim())) return false;
+
+  // Block obvious spam patterns
+  if (SPAM_KEYWORDS.some(k => title.includes(k) || company.includes(k))) return false;
+
+  // Must have some apply link
+  if (!job.apply_link || job.apply_link.length < 8) return false;
+  
   return true;
+}
+
+function isVerified(job: NormalizedJob): boolean {
+  // Anchor jobs are always verified
+  if (job.source === 'hiremind-india') return true;
+  // Top global sources that are reliable
+  if (['remotive', 'remoteok', 'arbeitnow'].includes(job.source)) return true;
+  // Specific trusted companies if found in adzuna
+  const trusted = ['google', 'microsoft', 'amazon', 'apple', 'meta', 'tcs', 'infosys', 'wipro', 'hcl', 'accenture', 'capgemini'];
+  if (trusted.some(c => job.company.toLowerCase().includes(c))) return true;
+  return false;
 }
 
 // ─── India Anchor Jobs (real companies, always shown — give users something real and useful)
@@ -119,6 +149,7 @@ function getIndiaAnchorJobs(query: string, location: string): NormalizedJob[] {
       normalized_salary_inr: '₹20 – 35 LPA', job_type: 'full-time', remote: false,
       skills_required: ['Python', 'Spark', 'Hadoop', 'Airflow'],
       apply_link: 'https://www.phonepe.com/careers', source: 'hiremind-india', india_relevant: true,
+      verified: true,
     },
   ];
 }
@@ -161,6 +192,7 @@ async function fetchAdzuna(query: string, city: string, remote: boolean): Promis
       apply_link: j.redirect_url || '',
       source: 'adzuna',
       india_relevant: true,
+      verified: isVerified({ company: j.company?.display_name } as any),
     }));
   } catch { return []; }
 }
@@ -361,8 +393,8 @@ export async function GET(request: Request) {
     ];
 
     // ── 3) Validate, merge anchors WITH live, deduplicate, sort ──
-    const validLive    = liveJobs.filter(isValidJob);
-    const merged       = deduplicateJobs([...anchorJobs, ...validLive]);
+    const validLive    = liveJobs.filter(isValidJob).map(j => ({ ...j, verified: isVerified(j) }));
+    const merged       = deduplicateJobs([...anchorJobs.map(j => ({ ...j, verified: true })), ...validLive]);
     const sorted       = sortJobs(merged);
 
     const liveCount = validLive.length;

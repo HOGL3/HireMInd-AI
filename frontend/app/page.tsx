@@ -57,13 +57,18 @@ export default function LandingPage() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   const [isHoveringGoo, setIsHoveringGoo] = useState(false)
 
+  const [mounted, setMounted] = useState(false)
+
   useEffect(() => {
+    setMounted(true)
     const handleMouseMove = (e: MouseEvent) => {
       setMousePosition({ x: e.clientX, y: e.clientY })
     }
     window.addEventListener('mousemove', handleMouseMove)
     return () => window.removeEventListener('mousemove', handleMouseMove)
   }, [])
+
+  if (!mounted) return <div className="min-h-screen bg-zinc-50" />
 
   return (
     <div className="relative min-h-screen text-zinc-900 font-sans selection:bg-emerald-200 selection:text-emerald-900 overflow-x-hidden">
@@ -98,7 +103,7 @@ export default function LandingPage() {
         />
 
         {/* Grain overlay for premium texture */}
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.025] mix-blend-overlay" />
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.025] mix-blend-overlay" />
 
         {/* Floating Geometric Parallax Elements */}
         {typeof window !== 'undefined' && (
@@ -138,9 +143,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 py-5 flex items-center justify-between">
           <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 rounded-xl bg-zinc-900 flex items-center justify-center shadow-md transition-transform group-hover:scale-105">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
+              <img src="/logo.png" alt="HireMind Logo" className="w-10 h-10 object-contain transition-transform group-hover:scale-105" />
               <span className="text-xl font-bold tracking-tight text-zinc-900">
                 HireMind
               </span>

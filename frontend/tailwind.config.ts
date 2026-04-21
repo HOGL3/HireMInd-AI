@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss'
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -15,6 +16,11 @@ const config: Config = {
           indigo: '#4F46E5',
           blue: '#2563EB',
           cyan: '#0891B2',
+        },
+        night: {
+          900: '#121212',
+          800: '#1a1a1a',
+          700: '#242424',
         },
       },
       boxShadow: {

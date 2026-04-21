@@ -7,8 +7,28 @@ from jobs.serializers import JobSerializer
 from accounts.models import Profile
 from .services import (
     get_embedding, calculate_fit_score, generate_cover_letter,
-    copilot_chat, extract_skills_from_text
+    copilot_chat, extract_skills_from_text, analyze_resume, extract_text_from_file
 )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def resume_analyze(request):
+    """Analyze resume text or file and return rating/suggestions."""
+    text = request.data.get('text', '')
+    
+    # Check for file upload
+    if 'file' in request.FILES:
+        uploaded_file = request.FILES['file']
+        text = extract_text_from_file(uploaded_file)
+        if not text:
+            return Response({'error': 'Failed to extract text from file.'}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+    if not text:
+        return Response({'error': 'Resume text or file required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    analysis = analyze_resume(text)
+    return Response(analysis)
 
 
 @api_view(['GET'])

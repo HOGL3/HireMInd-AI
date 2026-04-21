@@ -214,17 +214,12 @@ function DashboardContent() {
       <nav className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-zinc-200/60">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-xl bg-zinc-900 flex items-center justify-center shadow-md shadow-zinc-200 transition-transform group-hover:scale-105">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
+            <img src="/logo.png" alt="HireMind Logo" className="w-10 h-10 object-contain transition-transform group-hover:scale-105" />
             <span className="text-xl font-bold tracking-tight text-zinc-900">HireMind</span>
           </Link>
           <div className="flex items-center gap-6 text-sm font-medium">
             <Link href="/"       className="text-zinc-500 hover:text-zinc-900 transition-colors">Home</Link>
             <Link href="/market" className="text-zinc-500 hover:text-zinc-900 transition-colors">Market Intel</Link>
-            <a href="#" className="bg-zinc-900 text-white px-5 py-2.5 rounded-full hover:bg-emerald-600 transition-all duration-300 shadow-sm">
-              Post a Role
-            </a>
           </div>
         </div>
       </nav>
