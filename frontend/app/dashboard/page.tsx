@@ -49,7 +49,7 @@ function DashboardContent() {
     return () => clearTimeout(handler)
   }, [query])
 
-  // Fetch logic
+  // Fetch logic — uses internal Next.js API route which fans out to multiple free sources
   useEffect(() => {
     async function fetchJobs() {
       setLoading(true)
@@ -60,14 +60,37 @@ function DashboardContent() {
         if (filterLocation) params.append('location', filterLocation)
         if (filterRemote) params.append('remote', 'true')
 
-        const res = await fetch(`http://127.0.0.1:8000/api/jobs/search/?${params.toString()}`)
-        if (!res.ok) throw new Error('Failed to fetch jobs')
-        
+        // Use the internal Next.js API route — works in dev, Vercel, and serverless
+        const res = await fetch(`/api/search?${params.toString()}`)
+        if (!res.ok) throw new Error(`API returned ${res.status}`)
+
         const data = await res.json()
+        const source = res.headers.get('X-Jobs-Source')
+
+        if (!Array.isArray(data) || data.length === 0) {
+          throw new Error('Empty response')
+        }
+
         setJobs(data)
+
+        // Inform user if we're showing fallback data
+        if (source === 'fallback' || source === 'fallback-error') {
+          setError('Live job APIs are unavailable. Showing sample jobs — results update when APIs are configured.')
+        }
       } catch (err) {
-        console.error(err)
-        setError('Unable to fetch live jobs. Displaying fallback data.')
+        console.error('[Dashboard] fetchJobs error:', err)
+        setError('Unable to reach job sources. Showing sample data below.')
+        // Fetch fallback directly so the UI is never empty
+        try {
+          const params = new URLSearchParams()
+          if (debouncedQuery) params.append('q', debouncedQuery)
+          if (filterLocation) params.append('location', filterLocation)
+          const fallback = await fetch(`/api/search?${params.toString()}`)
+          const fallbackData = await fallback.json()
+          if (Array.isArray(fallbackData)) setJobs(fallbackData)
+        } catch {
+          // Ultimate fallback: keep whatever was previously in state
+        }
       } finally {
         setLoading(false)
       }
@@ -190,8 +213,15 @@ function DashboardContent() {
 
         {/* Status Row */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-600 px-5 py-4 rounded-2xl mb-8 text-sm font-medium flex items-center gap-3 shadow-sm">
-            <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse" /> {error}
+          <div className={`px-5 py-4 rounded-2xl mb-8 text-sm font-medium flex items-center gap-3 shadow-sm ${
+            error.includes('sample') || error.includes('Showing sample')
+              ? 'bg-amber-50 border border-amber-200 text-amber-700'
+              : 'bg-red-50 border border-red-200 text-red-600'
+          }`}>
+            <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${
+              error.includes('sample') || error.includes('Showing sample') ? 'bg-amber-500' : 'bg-red-600'
+            }`} />
+            {error}
           </div>
         )}
 
