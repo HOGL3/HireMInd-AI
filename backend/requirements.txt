@@ -1,0 +1,13 @@
+django
+djangorestframework
+django-cors-headers
+django-environ
+djangorestframework-simplejwt
+psycopg2-binary
+celery
+redis
+requests
+openai
+pdfminer.six
+beautifulsoup4
+gunicorn
